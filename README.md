@@ -71,6 +71,10 @@ RSS_FEEDS=https://tech.meituan.com/feed/,https://www.solidot.org/index.rss,https
 ![Demo 1](images/demo1.png)
 <br>
 ![Demo 2](images/demo2.png)
+<br>
+![Feishu Demo](images/demo3.png)
+<br>
+![Runtime Demo](images/demo4.png)
 
 ## Prerequisites
 

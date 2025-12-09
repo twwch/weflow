@@ -15,10 +15,62 @@
     - **全局去重**: 智能追踪图片使用情况，确保整篇日报中没有重复图片。
 - **智能通知**:
     - **飞书卡片**: 推送成功后，自动向飞书群发送包含状态、摘要和草稿 ID 的精美卡片。
-- **核心流程**:
-    - **RSS 监控**: 默认追踪 OpenAI, DeepMind, MIT Tech Review 等顶级技术源。
-    - **智能抓取**: 使用 Firecrawl 提取干净的 Markdown 内容。
-    - **状态追踪**: 使用 PostgreSQL 记录已处理链接，防止重复抓取。
+
+## 架构概览
+
+```mermaid
+graph TD
+    RSS[RSS Sources] -->|Fetch| Fetcher[Fetcher Service]
+    Fetcher -->|URLs| DB[(PostgreSQL)]
+    Fetcher -->|New Articles| Crawler[Firecrawl Scraper]
+    Crawler -->|Markdown| Analyzer[LLM Analyzer]
+    Analyzer -->|Topics| Cluster[Topic Clusterer]
+    
+    subgraph "Multimodal Synthesis"
+        Cluster -->|Img URLs| Vision[Qwen-VL Vision]
+        Vision -->|Descriptions| Synthesizer[DeepSeek Unifier]
+        Cluster -->|Content| Synthesizer
+        Synthesizer -->|Unified Draft| Formatter[WeChat Formatter]
+    end
+    
+    Formatter -->|Assets| Uploader[WeChat Uploader]
+    Uploader -->|Push| MP[WeChat Official Account]
+    MP -.->|Callback| Feishu[Feishu Notification]
+```
+
+## RSS 配置详解
+
+WeFlow 采用以下**优先级逻辑**加载 RSS 源：
+
+1. **优先级最高**：环境变量 `RSS_FEEDS`。如果 `.env` 中配置了此项（非空），系统将**仅使用**这里指定的源，忽略默认列表。
+2. **默认回退**：内置源列表。如果 `.env` 中未配置 `RSS_FEEDS` 或为空，系统将自动加载以下内置的高质量技术源：
+    - OpenAI Blog
+    - BAIR (Berkeley AI Research)
+    - DeepMind
+    - Distill
+    - MIT Technology Review
+    - Hugging Face Blog
+    - AI Shift
+    - Ethics and Society
+    - The Gradient
+    - Machine Learning Mastery
+    - KDnuggets
+    - Artificial Intelligence News
+
+### 自定义配置示例
+
+在 `.env` 文件中配置，使用逗号分隔多个 URL：
+
+```env
+# 覆盖默认源，仅抓取以下列表
+RSS_FEEDS=https://tech.meituan.com/feed/,https://www.solidot.org/index.rss,https://feeds.feedburner.com/PythonInsider
+```
+
+## 效果展示
+
+![Demo 1](images/demo1.png)
+<br>
+![Demo 2](images/demo2.png)
 
 ## 环境要求
 
@@ -39,6 +91,20 @@
    uv sync
    ```
 
+## 数据库设置 (Docker 快速启动)
+
+如果你本地没有 PostgreSQL，可以使用 Docker 快速启动一个：
+
+```bash
+docker run -d \
+  --name weflow-db \
+  -e POSTGRES_USER=weflow \
+  -e POSTGRES_PASSWORD=weflow \
+  -e POSTGRES_DB=weflow \
+  -p 5432:5432 \
+  postgres:15
+```
+
 ## 配置指南
 
 1. **初始化环境变量**
@@ -46,13 +112,20 @@
    cp .env.example .env
    ```
 
+
 2. **编辑 `.env` 文件**:
+
+   > **API Key 获取地址**:
+   > - **Firecrawl**: [firecrawl.dev](https://firecrawl.dev/)
+   > - **DeepSeek**: [platform.deepseek.com](https://platform.deepseek.com/)
+   > - **DashScope (Qwen)**: [dashscope.console.aliyun.com](https://dashscope.console.aliyun.com/)
 
    ```env
    # 核心服务
    FIRECRAWL_API_KEY=fc_...      # 网页抓取 (Firecrawl)
    DEEPSEEK_API_KEY=sk-...       # LLM (深度总结与融合)
-   DATABASE_URL=postgres://...   # 数据库连接
+   # 数据库连接 (对应上述 Docker 配置)
+   DATABASE_URL=postgresql://weflow:weflow@localhost:5432/weflow
    
    # 微信公众号
    WECHAT_APP_ID=wx...
